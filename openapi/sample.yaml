@@ -1,0 +1,243 @@
+# Placeholder spec used until the real backend URL is configured (OPENAPI_URL).
+openapi: 3.0.3
+info:
+  title: SIPCA sample API
+  version: 0.0.1
+paths:
+  /metrics/monthly:
+    get:
+      tags: [metrics]
+      operationId: getMonthlyMetrics
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema: { type: integer, example: 2026 }
+      responses:
+        '200':
+          description: Monthly metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MonthlyMetric' }
+  /orders:
+    get:
+      tags: [orders]
+      operationId: listOrders
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Paged orders
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPage' }
+    post:
+      tags: [orders]
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrder' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+  /orders/{orderId}:
+    get:
+      tags: [orders]
+      operationId: getOrder
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404':
+          description: Not found
+  /anagrafica/recent-activity:
+    get:
+      tags: [anagrafica]
+      operationId: getRecentActivity
+      summary: Last entities the current user worked on ("Riprendi")
+      responses:
+        '200':
+          description: Most recent first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RecentActivityItem' }
+  /anagrafica/attention:
+    get:
+      tags: [anagrafica]
+      operationId: getAttentionItems
+      summary: Items that need the user's attention ("Attenzione richiesta")
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 5 } }
+      responses:
+        '200':
+          description: Most urgent first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttentionPage' }
+  /anagrafica/contraenti/status-summary:
+    get:
+      tags: [anagrafica]
+      operationId: getContraentiStatusSummary
+      responses:
+        '200':
+          description: Number of contraenti per status
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StatusCount' }
+  /anagrafica/counters:
+    get:
+      tags: [anagrafica]
+      operationId: getAnagraficaCounters
+      responses:
+        '200':
+          description: Work-queue counters shown on the Anagrafica dashboard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnagraficaCounters' }
+  /anagrafica/automatic-discards:
+    get:
+      tags: [anagrafica]
+      operationId: getAutomaticDiscards
+      responses:
+        '200':
+          description: Nightly automatic discard jobs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomaticDiscards' }
+components:
+  schemas:
+    MonthlyMetric:
+      type: object
+      required: [month, orders, revenue]
+      properties:
+        month: { type: string, pattern: '^\d{4}-\d{2}$', example: '2026-01' }
+        orders: { type: integer, minimum: 0 }
+        revenue: { type: number, minimum: 0 }
+    OrderStatus:
+      type: string
+      enum: [draft, confirmed, shipped, cancelled]
+    Order:
+      type: object
+      required: [id, customer, total, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        customer: { type: string }
+        total: { type: number, minimum: 0 }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        createdAt: { type: string, format: date-time }
+    CreateOrder:
+      type: object
+      required: [customer, total]
+      properties:
+        customer: { type: string, minLength: 1, maxLength: 120 }
+        total: { type: number, minimum: 0 }
+    OrderPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+    AnagraficaSection:
+      type: string
+      enum: [contraenti, schede-fido, mandati-intermediari, operatori-direzione, compagnie-assicurative, sub-intermediari, notai, prestatori-servizi, report-dati-intermediari]
+    EntityKind:
+      type: string
+      enum: [CONTRAENTE, SCHEDA_FIDO, MANDATO]
+    RecentActivityItem:
+      type: object
+      required: [id, kind, label, updatedAt]
+      properties:
+        id: { type: string }
+        kind: { $ref: '#/components/schemas/EntityKind' }
+        label: { type: string }
+        version: { type: integer, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    EntityRef:
+      type: object
+      required: [section, id]
+      properties:
+        section: { $ref: '#/components/schemas/AnagraficaSection' }
+        id: { type: string }
+    AttentionItem:
+      type: object
+      required: [id, title, subject, priority, target]
+      properties:
+        id: { type: string }
+        title: { type: string, description: Already localised by the backend (Accept-Language) }
+        subject: { type: string }
+        priority: { type: string, enum: [HIGH, NORMAL] }
+        dueInDays: { type: integer, nullable: true }
+        expired: { type: boolean }
+        target: { $ref: '#/components/schemas/EntityRef' }
+    AttentionPage:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AttentionItem' }
+        total: { type: integer, minimum: 0 }
+    ContraenteStatus:
+      type: string
+      enum: [ATTIVO, NUOVA_REVISIONE, ANNULLATO, ATTIVO_TEMPORANEO, ATTIVO_TEMPORANEO_SCADUTO]
+    StatusCount:
+      type: object
+      required: [status, count]
+      properties:
+        status: { $ref: '#/components/schemas/ContraenteStatus' }
+        count: { type: integer, minimum: 0 }
+    AnagraficaCounters:
+      type: object
+      required: [contraenti, schedeFido, mandati]
+      properties:
+        contraenti:
+          type: object
+          required: [revisioniInCorso, attivazioniTemporanee, documentiInScadenza]
+          properties:
+            revisioniInCorso: { type: integer, minimum: 0 }
+            attivazioniTemporanee: { type: integer, minimum: 0 }
+            documentiInScadenza: { type: integer, minimum: 0 }
+        schedeFido:
+          type: object
+          required: [inIstruttoriaDirezione, inDeliberaPrimoLivello, bloccate]
+          properties:
+            inIstruttoriaDirezione: { type: integer, minimum: 0 }
+            inDeliberaPrimoLivello: { type: integer, minimum: 0 }
+            bloccate: { type: integer, minimum: 0 }
+        mandati:
+          type: object
+          required: [revocaRichiesta, attesaAttivazione, daTrasmettereIvass]
+          properties:
+            revocaRichiesta: { type: integer, minimum: 0 }
+            attesaAttivazione: { type: integer, minimum: 0 }
+            daTrasmettereIvass: { type: integer, minimum: 0 }
+    AutomaticDiscards:
+      type: object
+      required: [lastRunAt, jobs]
+      properties:
+        lastRunAt: { type: string, format: date-time }
+        jobs:
+          type: array
+          items:
+            type: string
+            enum: [REVISIONI_ANNULLATE, PROPOSTE_FIDO_ANNULLATE]

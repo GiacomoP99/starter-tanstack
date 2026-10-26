@@ -1,0 +1,9 @@
+# pnpm settings for this project (single package, no workspace packages).
+
+# Refuse to install with a Node/pnpm version outside package.json "engines".
+engineStrict: true
+
+# Native binaries come from optional deps; their postinstall scripts aren't needed.
+ignoredBuiltDependencies:
+  - esbuild
+  - lefthook
